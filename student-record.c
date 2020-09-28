@@ -10,6 +10,7 @@ void catch_error(char *str, MYSQL *mysql )
 }
 int main(){
     MYSQL *mysql;
+    MYSQL_RES *res;
     char c;
     char *line = NULL;
     size_t len = 0;
