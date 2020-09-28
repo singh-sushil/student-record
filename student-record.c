@@ -3,9 +3,12 @@ This project is completely written in C. The project is mainly focused on explic
 No any inbuilt function is used for exectution of SQL statement like CREATE,DROP,UPDATE,INSERT,SELECT,SHOW,DESCRIBE,
 EXPLAIN,CHECK TABLE.*/
 #include<stdio.h>
+#include<termios.h>
+#include<string.h>
 #include<stdlib.h>
 #include<unistd.h>
 #include<mysql/mysql.h> //header file consisting of C API code
+#include"custom.h"
 #define _GNU_SOURCE
 /*catch_error() is error handling custom function*/
 void catch_error(char *str, MYSQL *mysql )
@@ -13,6 +16,35 @@ void catch_error(char *str, MYSQL *mysql )
     printf("%s:%u,%s\n", str, mysql_errno(mysql),mysql_error(mysql));
     mysql_close(mysql);
     exit(EXIT_FAILURE);
+}
+char  *enter_password(char *password)
+{
+    char c;
+    char *new;
+    int i = 0;
+    while((c = getch()) != '\n')
+    {
+        if (c != 127 ){    
+            new = realloc(password, i + 2);
+            memcpy(new + i, &c, 1);
+            password = new;
+            printf("*");
+            i++;
+        }else if(c == 127 && i != 0){
+            printf("\b \b");
+            i--;
+            if( i == 0 )
+                password = NULL;
+            else {
+                new = realloc(password, i);
+                password = new;
+            }
+        }
+    }
+    new = realloc(password, i + 1);
+    password = new;
+    password[i]= '\0';
+    return password;
 }
 int main(){
     MYSQL *mysql = NULL;
@@ -24,14 +56,16 @@ int main(){
     char *line = NULL;
     size_t len = 0;
     size_t nread;
-    char hostname[15],user[10],password[15],databaseN[15];
+    char hostname[15],user[10],*password = NULL,databaseN[15];
     printf("enter the host name\n");
     scanf("%s",hostname);
+    while ((getchar()) != '\n');
     printf("enter user name\n");
     scanf("%s",user);
+    while ((getchar()) != '\n');
     printf("enter password\n");
-    scanf("%s",password);
-    printf("enter database name\n");
+    password = enter_password(password);
+    printf("\nenter database name\n");
     scanf("%s",databaseN);
     while ((getchar()) != '\n');
     printf("enter sql command\n");
@@ -106,5 +140,6 @@ int main(){
     /*mysql_library_end() finalizes the MySQL client library.calling this causes the avoidance of memory
     leaks after the application is done.*/
     mysql_library_end(); 
+    free(password);
     return(EXIT_SUCCESS);
 }
