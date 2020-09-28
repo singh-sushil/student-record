@@ -15,6 +15,7 @@ void catch_error(char *str, MYSQL *mysql )
 {
     printf("%s:%u,%s\n", str, mysql_errno(mysql),mysql_error(mysql));
     mysql_close(mysql);
+    mysql_library_end();
     exit(EXIT_FAILURE);
 }
 char  *enter_password(char *password)
@@ -53,13 +54,12 @@ int main(){
     MYSQL_ROW row;
     char c;
     int flag;
-    char *line = NULL;
     size_t len = 0;
     size_t nread;
     char hostname[15],user[10],*password = NULL,databaseN[15];
     printf("enter the host name\n");
     scanf("%s",hostname);
-    while ((getchar()) != '\n');
+    while ((getchar()) != '\n'); //flushes the stdin buffer
     printf("enter user name\n");
     scanf("%s",user);
     while ((getchar()) != '\n');
@@ -68,9 +68,6 @@ int main(){
     printf("\nenter database name\n");
     scanf("%s",databaseN);
     while ((getchar()) != '\n');
-    printf("enter sql command\n");
-    nread = getline(&line, &len, stdin);
-    *(line+nread-1) = '\0';
     /*mysql_library_init() initializes the MySQL client library before you call any other MySQL function.*/
     if (mysql_library_init(0, NULL, NULL) != 0 ){
         catch_error("mysql_library_init", mysql);
@@ -84,55 +81,70 @@ int main(){
     require a valid MYSQL connection handler structure.*/
     if (!mysql_real_connect(mysql, hostname, user, password, databaseN, 0, NULL, CLIENT_MULTI_STATEMENTS))
     {
+        free(password);
         catch_error("mysql_real_connect",mysql);
     }
-    /*mysql_query() executes the SQL statement pointed to by the null-terminated string line.*/
-    if (mysql_query(mysql,line) == 0){
-        free(line);//pointer to string representing SQL statement should be freed for effieciency. 
-        printf("the number of rows affected:%ld\n", mysql_affected_rows(mysql));
-        /*After invoking mysql_query() or mysql_real_query(), we must call mysql_store_result()
-        for every statement that successfully produces a result set (SELECT, SHOW,
-        DESCRIBE, EXPLAIN, CHECK TABLE, and so forth)*/
-        do{
-            res = mysql_store_result(mysql);
-            if(res){
-                printf("mysql_store_result succedeed\n");
-                int num_fields = mysql_num_fields(res);
-                while (row = mysql_fetch_row(res))
+    free(password);
+    do{
+        system("clear");
+        char *line = NULL;
+        printf("enter sql command\n");
+        nread = getline(&line, &len, stdin);
+        *(line + nread - 1) = '\0';
+        /*mysql_query() executes the SQL statement pointed to by the null-terminated string line.*/
+        if (mysql_query(mysql, line) == 0)
+        {
+            free(line); //pointer to string representing SQL statement should be freed for effieciency.
+            printf("the number of rows affected:%ld\n", mysql_affected_rows(mysql));
+            /*After invoking mysql_query() or mysql_real_query(), we must call mysql_store_result()
+            for every statement that successfully produces a result set (SELECT, SHOW,
+            DESCRIBE, EXPLAIN, CHECK TABLE, and so forth)*/
+            do
+            {
+                res = mysql_store_result(mysql);
+                if (res)
                 {
-                    for (int i = 0; i < num_fields; i++)
+                    int num_fields = mysql_num_fields(res);
+                    while (row = mysql_fetch_row(res))
                     {
-                        if (i == 0)
+                        for (int i = 0; i < num_fields; i++)
                         {
-                            while (field = mysql_fetch_field(res))
+                            if (i == 0)
                             {
-                                printf("%s", field->name);
+                                while (field = mysql_fetch_field(res))
+                                {
+                                    printf("%s ", field->name);
+                                }
+                                printf("\n");
                             }
-                            printf("\n");
+                            printf("%s ", row[i] ? row[i] : "NULL");
                         }
-                        printf("%s ", row[i] ? row[i] : "NULL");
+                        printf("\n");
                     }
-                    printf("\n");
+                    /*mysql_free_result() frees the memory allocated for a result set by mysql_store_result()*/
                 }
-                /*mysql_free_result() frees the memory allocated for a result set by mysql_store_result()*/
-                
-            }else{
-                /*mysql_field_count() returns the number of columns for the most recent query on the connection.*/
-                if (mysql_field_count(mysql) == 0)
-                    printf("empty result set\n");
                 else
-                    catch_error("mysql_result_store", mysql);
-            }
-            mysql_free_result(res);
-            flag = mysql_next_result(mysql);
-            if (flag > 0)
-                catch_error("mysql_next_result", mysql);
-        }while(flag == 0);
-    }   
-    else{
-        free(line);
-        catch_error("mysql_query", mysql);
-    }
+                {
+                    /*mysql_field_count() returns the number of columns for the most recent query on the connection.*/
+                    if (mysql_field_count(mysql) == 0)
+                        printf("empty result set\n");
+                    else
+                        catch_error("mysql_result_store", mysql);
+                }
+                mysql_free_result(res);
+                flag = mysql_next_result(mysql);
+                if (flag > 0)
+                    catch_error("mysql_next_result", mysql);
+            } while (flag == 0);
+        }   
+        else{
+            free(line);
+            catch_error("mysql_query", mysql);
+        }
+        printf("press 'y' for next query ");
+        scanf("%c",&c);
+        while ((getchar()) != '\n');
+    }while(c == 'y' || c == 'Y');
     /*mysql_close() closes a previously opened connection. mysql_close() also deallocates the connection
     handler pointed to by mysql if the handler was allocated automatically by mysql_init() or
     mysql_connect()*/
@@ -140,6 +152,5 @@ int main(){
     /*mysql_library_end() finalizes the MySQL client library.calling this causes the avoidance of memory
     leaks after the application is done.*/
     mysql_library_end(); 
-    free(password);
     return(EXIT_SUCCESS);
 }
